@@ -34,10 +34,10 @@ const Navbar = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => window.location.href = '/auth'}>
               Sign In
             </Button>
-            <Button variant="hero" size="sm">
+            <Button variant="hero" size="sm" onClick={() => window.location.href = '/auth'}>
               Get Started Free
             </Button>
           </div>
@@ -66,10 +66,10 @@ const Navbar = () => {
                 Pricing
               </a>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
-                <Button variant="ghost" size="sm" className="justify-start">
+                <Button variant="ghost" size="sm" className="justify-start" onClick={() => window.location.href = '/auth'}>
                   Sign In
                 </Button>
-                <Button variant="hero" size="sm">
+                <Button variant="hero" size="sm" onClick={() => window.location.href = '/auth'}>
                   Get Started Free
                 </Button>
               </div>
