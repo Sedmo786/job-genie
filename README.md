@@ -2,7 +2,13 @@
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+-Add job preferences form so users can set their ideal role, salary range, location, and work type preferences.
+
+-Build AI job matching that analyzes uploaded resumes and suggests relevant job postings.
+
+-Add an applications tracker to monitor job application status, interviews, and responses.
+
+
 
 ## How can I edit this code?
 
