@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useResume } from '@/hooks/useResume';
+import { useResumeAnalysis } from '@/hooks/useResumeAnalysis';
 import { ResumeUpload } from '@/components/resumes/ResumeUpload';
 import { ResumeList } from '@/components/resumes/ResumeList';
 import Navbar from '@/components/layout/Navbar';
@@ -19,6 +20,8 @@ export default function Resumes() {
     setPrimaryResume,
     getResumeUrl,
   } = useResume();
+  
+  const { analysis, analyzing, analyzeResume } = useResumeAnalysis();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -44,7 +47,7 @@ export default function Resumes() {
           <div>
             <h1 className="text-3xl font-bold">My Resumes</h1>
             <p className="text-muted-foreground mt-2">
-              Upload and manage your resumes for job applications
+              Upload and manage your resumes. Use AI to analyze and extract skills, experience, and education.
             </p>
           </div>
 
@@ -56,6 +59,9 @@ export default function Resumes() {
             onDelete={deleteResume}
             onSetPrimary={setPrimaryResume}
             onGetUrl={getResumeUrl}
+            onAnalyze={analyzeResume}
+            analyzing={analyzing}
+            analysis={analysis}
           />
         </div>
       </main>
