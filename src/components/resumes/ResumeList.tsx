@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { FileText, Download, Trash2, Star, MoreVertical, Eye } from 'lucide-react';
+import { FileText, Download, Trash2, Star, MoreVertical, Eye, Sparkles, Loader2, GraduationCap, Briefcase, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Resume } from '@/hooks/useResume';
+import { ResumeAnalysis } from '@/hooks/useResumeAnalysis';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ResumeListProps {
@@ -28,6 +29,9 @@ interface ResumeListProps {
   onDelete: (resume: Resume) => Promise<void>;
   onSetPrimary: (resumeId: string) => Promise<void>;
   onGetUrl: (filePath: string) => Promise<string | null>;
+  onAnalyze?: (resumeId: string) => Promise<unknown>;
+  analyzing?: boolean;
+  analysis?: ResumeAnalysis | null;
 }
 
 export function ResumeList({
@@ -36,6 +40,9 @@ export function ResumeList({
   onDelete,
   onSetPrimary,
   onGetUrl,
+  onAnalyze,
+  analyzing = false,
+  analysis,
 }: ResumeListProps) {
   const [deleteResume, setDeleteResume] = useState<Resume | null>(null);
 
@@ -111,6 +118,10 @@ export function ResumeList({
     );
   }
 
+  // Parse education and work history from JSON
+  const education = analysis?.education as Array<{ degree: string; institution: string; year: number }> | null;
+  const workHistory = analysis?.work_history as Array<{ title: string; company: string; duration: string; responsibilities?: string[] }> | null;
+
   return (
     <>
       <Card>
@@ -136,12 +147,36 @@ export function ResumeList({
                         Primary
                       </Badge>
                     )}
+                    {analysis?.resume_id === resume.id && (
+                      <Badge variant="outline" className="flex-shrink-0 text-primary border-primary/30">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Analyzed
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {formatFileSize(resume.file_size)} • Uploaded{' '}
                     {formatDistanceToNow(new Date(resume.created_at), { addSuffix: true })}
                   </p>
                 </div>
+                {onAnalyze && (
+                  <Button
+                    variant="heroOutline"
+                    size="sm"
+                    onClick={() => onAnalyze(resume.id)}
+                    disabled={analyzing}
+                    className="flex-shrink-0"
+                  >
+                    {analyzing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        Analyze
+                      </>
+                    )}
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
@@ -177,6 +212,106 @@ export function ResumeList({
           </div>
         </CardContent>
       </Card>
+
+      {/* Analysis Results */}
+      {analysis && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Resume Analysis
+            </CardTitle>
+            <CardDescription>
+              Analyzed {formatDistanceToNow(new Date(analysis.analyzed_at), { addSuffix: true })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Summary */}
+            {analysis.summary && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">Professional Summary</h4>
+                <p className="text-sm text-muted-foreground bg-secondary/50 p-3 rounded-lg">
+                  {analysis.summary}
+                </p>
+              </div>
+            )}
+
+            {/* Skills */}
+            {analysis.skills && analysis.skills.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">Skills ({analysis.skills.length})</h4>
+                <div className="flex flex-wrap gap-2">
+                  {analysis.skills.map((skill, i) => (
+                    <Badge key={i} variant="secondary">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Experience */}
+            {analysis.experience_years && (
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Briefcase className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Years of Experience</p>
+                  <p className="text-lg font-semibold">{analysis.experience_years} years</p>
+                </div>
+              </div>
+            )}
+
+            {/* Education */}
+            {education && education.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  Education
+                </h4>
+                <div className="space-y-2">
+                  {education.map((edu, i) => (
+                    <div key={i} className="bg-secondary/30 p-3 rounded-lg">
+                      <p className="font-medium">{edu.degree}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {edu.institution} {edu.year && `• ${edu.year}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Work History */}
+            {workHistory && workHistory.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Briefcase className="h-4 w-4" />
+                  Work History
+                </h4>
+                <div className="space-y-3">
+                  {workHistory.slice(0, 3).map((job, i) => (
+                    <div key={i} className="bg-secondary/30 p-3 rounded-lg">
+                      <p className="font-medium">{job.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {job.company} • {job.duration}
+                      </p>
+                      {job.responsibilities && job.responsibilities.length > 0 && (
+                        <ul className="mt-2 text-sm text-muted-foreground list-disc list-inside">
+                          {job.responsibilities.slice(0, 2).map((resp, j) => (
+                            <li key={j}>{resp}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog open={!!deleteResume} onOpenChange={() => setDeleteResume(null)}>
         <AlertDialogContent>
