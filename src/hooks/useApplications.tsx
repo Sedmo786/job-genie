@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useNotifications } from '@/hooks/useNotifications';
 import type { Database, Json } from '@/integrations/supabase/types';
 
 type ApplicationStatus = Database['public']['Enums']['application_status'];
@@ -28,6 +29,7 @@ export interface ApplicationInput {
 
 export const useApplications = () => {
   const { user } = useAuth();
+  const { sendStatusUpdateNotification, sendApplicationCompleteNotification } = useNotifications();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,7 +59,7 @@ export const useApplications = () => {
     fetchApplications();
   }, [fetchApplications]);
 
-  const addApplication = async (input: ApplicationInput) => {
+  const addApplication = async (input: ApplicationInput, sendNotification = true) => {
     if (!user) {
       toast.error('Please sign in');
       return null;
@@ -77,6 +79,19 @@ export const useApplications = () => {
       
       setApplications(prev => [data, ...prev]);
       toast.success('Application added');
+      
+      // Send notification for new application
+      if (sendNotification && (input.status === 'applied' || input.status === 'auto_applied')) {
+        sendApplicationCompleteNotification({
+          job_title: data.job_title,
+          company_name: data.company_name,
+          status: data.status,
+          job_url: data.job_url || undefined,
+          location: data.location || undefined,
+          match_score: data.match_score || undefined,
+        });
+      }
+      
       return data;
     } catch (error) {
       console.error('Error adding application:', error);
@@ -85,8 +100,10 @@ export const useApplications = () => {
     }
   };
 
-  const updateApplication = async (id: string, updates: Partial<ApplicationInput>) => {
+  const updateApplication = async (id: string, updates: Partial<ApplicationInput>, sendNotification = true) => {
     if (!user) return null;
+
+    const previousApp = applications.find(a => a.id === id);
 
     try {
       const { data, error } = await supabase
@@ -101,6 +118,21 @@ export const useApplications = () => {
       
       setApplications(prev => prev.map(a => a.id === id ? data : a));
       toast.success('Application updated');
+      
+      // Send notification if status changed
+      if (sendNotification && updates.status && previousApp?.status !== updates.status) {
+        const notifiableStatuses = ['screening', 'interviewing', 'offer', 'rejected'];
+        if (notifiableStatuses.includes(updates.status)) {
+          sendStatusUpdateNotification({
+            job_title: data.job_title,
+            company_name: data.company_name,
+            status: data.status,
+            job_url: data.job_url || undefined,
+            location: data.location || undefined,
+          });
+        }
+      }
+      
       return data;
     } catch (error) {
       console.error('Error updating application:', error);
