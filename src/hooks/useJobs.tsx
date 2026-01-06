@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useNotifications } from '@/hooks/useNotifications';
 import type { Database } from '@/integrations/supabase/types';
 
 type ExperienceLevel = Database['public']['Enums']['experience_level'];
@@ -44,6 +45,7 @@ export interface JobMatch {
 
 export const useJobs = () => {
   const { user, session } = useAuth();
+  const { sendNewMatchesNotification } = useNotifications();
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [matchedJobs, setMatchedJobs] = useState<JobMatch[]>([]);
   const [loading, setLoading] = useState(false);
@@ -99,7 +101,7 @@ export const useJobs = () => {
     setPage(prev => prev + 1);
   }, []);
 
-  const matchJobs = useCallback(async (jobIds: string[]) => {
+  const matchJobs = useCallback(async (jobIds: string[], sendNotification = false) => {
     if (!user || !session || jobIds.length === 0) return;
 
     setMatching(true);
@@ -129,6 +131,20 @@ export const useJobs = () => {
 
       setMatchedJobs(matchedJobsData);
 
+      // Send notification for high-quality matches
+      if (sendNotification && matchedJobsData.length > 0) {
+        const goodMatches = matchedJobsData.filter(m => m.score >= 60);
+        if (goodMatches.length > 0) {
+          sendNewMatchesNotification(goodMatches.map(m => ({
+            job_title: m.job.title,
+            company_name: m.job.company,
+            match_score: m.score,
+            job_url: m.job.apply_url || undefined,
+            location: m.job.location || undefined,
+          })));
+        }
+      }
+
       if (!data.user_has_analysis) {
         toast.info('Upload and analyze your resume for better job matching');
       }
@@ -141,7 +157,7 @@ export const useJobs = () => {
     } finally {
       setMatching(false);
     }
-  }, [user, session, jobs]);
+  }, [user, session, jobs, sendNewMatchesNotification]);
 
   const getJobById = useCallback(async (id: string): Promise<JobPosting | null> => {
     try {
