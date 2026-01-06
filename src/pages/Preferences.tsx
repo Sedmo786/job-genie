@@ -5,9 +5,11 @@ import { useJobPreferences, type JobPreferencesInput } from '@/hooks/useJobPrefe
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sparkles, ArrowLeft, Loader2, Save } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { Sparkles, ArrowLeft, Loader2, Save, Zap, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 
 const Preferences = () => {
@@ -25,6 +27,9 @@ const Preferences = () => {
     experience_level: 'mid',
     job_types: ['full-time'],
     industries: [],
+    auto_apply_enabled: false,
+    auto_apply_threshold: 75,
+    auto_apply_daily_limit: 10,
   });
 
   const [rolesInput, setRolesInput] = useState('');
@@ -48,6 +53,9 @@ const Preferences = () => {
         experience_level: preferences.experience_level || 'mid',
         job_types: preferences.job_types || ['full-time'],
         industries: preferences.industries || [],
+        auto_apply_enabled: preferences.auto_apply_enabled || false,
+        auto_apply_threshold: preferences.auto_apply_threshold || 75,
+        auto_apply_daily_limit: preferences.auto_apply_daily_limit || 10,
       });
       setRolesInput((preferences.desired_roles || []).join(', '));
       setLocationsInput((preferences.locations || []).join(', '));
@@ -165,13 +173,85 @@ const Preferences = () => {
                 </Select>
               </div>
             </div>
-
-            <Button onClick={handleSave} disabled={saving} className="w-full">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Preferences
-            </Button>
           </CardContent>
         </Card>
+
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+                <Zap className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Auto-Apply</CardTitle>
+                <CardDescription>Automatically apply to matching jobs</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-background border">
+              <div>
+                <p className="font-medium">Enable Auto-Apply</p>
+                <p className="text-sm text-muted-foreground">Automatically apply to jobs above your match threshold</p>
+              </div>
+              <Switch
+                checked={form.auto_apply_enabled}
+                onCheckedChange={(checked) => setForm({ ...form, auto_apply_enabled: checked })}
+              />
+            </div>
+
+            {form.auto_apply_enabled && (
+              <>
+                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 flex gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-500">Important</p>
+                    <p className="text-muted-foreground">Auto-apply will submit applications on your behalf. Make sure your resume and profile are up to date.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <Label>Match Threshold</Label>
+                      <span className="text-sm font-medium text-primary">{form.auto_apply_threshold}%</span>
+                    </div>
+                    <Slider
+                      value={[form.auto_apply_threshold || 75]}
+                      onValueChange={(v) => setForm({ ...form, auto_apply_threshold: v[0] })}
+                      min={50}
+                      max={100}
+                      step={5}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">Only auto-apply to jobs with a match score above this threshold</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <Label>Daily Limit</Label>
+                      <span className="text-sm font-medium text-primary">{form.auto_apply_daily_limit} jobs/day</span>
+                    </div>
+                    <Slider
+                      value={[form.auto_apply_daily_limit || 10]}
+                      onValueChange={(v) => setForm({ ...form, auto_apply_daily_limit: v[0] })}
+                      min={1}
+                      max={50}
+                      step={1}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground">Maximum number of auto-applications per day</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Button onClick={handleSave} disabled={saving} className="w-full" size="lg">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          Save Preferences
+        </Button>
       </main>
     </div>
   );
