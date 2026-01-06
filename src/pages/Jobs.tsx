@@ -3,20 +3,24 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useJobs } from '@/hooks/useJobs';
 import { useApplications } from '@/hooks/useApplications';
+import { useAutoApply } from '@/hooks/useAutoApply';
+import { useJobPreferences } from '@/hooks/useJobPreferences';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Sparkles, ArrowLeft, Loader2, Search, MapPin, Briefcase, ExternalLink, Plus, Zap } from 'lucide-react';
+import { Sparkles, ArrowLeft, Loader2, Search, MapPin, Briefcase, ExternalLink, Plus, Zap, Rocket } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Jobs = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { jobs, matchedJobs, loading, matching, fetchJobs, matchJobs, hasMore, loadMore } = useJobs();
-  const { addApplication } = useApplications();
+  const { addApplication, refetch: refetchApplications } = useApplications();
+  const { autoApply, applying } = useAutoApply();
+  const { preferences } = useJobPreferences();
 
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('');
@@ -33,10 +37,29 @@ const Jobs = () => {
     fetchJobs(query, location, remoteOnly, true);
   };
 
-  const handleMatch = () => {
+  const handleMatch = async () => {
     if (jobs.length > 0) {
-      matchJobs(jobs.map(j => j.id));
+      await matchJobs(jobs.map(j => j.id));
       setShowMatched(true);
+    }
+  };
+
+  const handleAutoApply = async () => {
+    if (matchedJobs.length === 0) {
+      toast.error('Match jobs first to use auto-apply');
+      return;
+    }
+    
+    const matches = matchedJobs.map(m => ({
+      job_id: m.job.id,
+      score: m.score,
+      reasons: m.reasons,
+      explanation: m.explanation,
+    }));
+    
+    const result = await autoApply(matches);
+    if (result?.summary && (result.summary.auto_applied > 0 || result.summary.manual_required > 0)) {
+      refetchApplications();
     }
   };
 
@@ -124,11 +147,23 @@ const Jobs = () => {
               </Button>
             </div>
             {jobs.length > 0 && (
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button variant="outline" onClick={handleMatch} disabled={matching}>
                   {matching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
                   AI Match ({matchedJobs.length})
                 </Button>
+                {matchedJobs.length > 0 && preferences?.auto_apply_enabled && (
+                  <Button onClick={handleAutoApply} disabled={applying} className="bg-green-600 hover:bg-green-700">
+                    {applying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Rocket className="h-4 w-4 mr-2" />}
+                    Auto-Apply ({preferences.auto_apply_threshold}%+ matches)
+                  </Button>
+                )}
+                {matchedJobs.length > 0 && !preferences?.auto_apply_enabled && (
+                  <Button variant="outline" onClick={() => navigate('/preferences')} className="text-muted-foreground">
+                    <Rocket className="h-4 w-4 mr-2" />
+                    Enable Auto-Apply
+                  </Button>
+                )}
                 {showMatched && (
                   <Button variant="ghost" onClick={() => setShowMatched(false)}>Show All Jobs</Button>
                 )}

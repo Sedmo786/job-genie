@@ -19,6 +19,9 @@ export interface JobPreferences {
   experience_level: ExperienceLevel;
   job_types: string[];
   industries: string[];
+  auto_apply_enabled: boolean;
+  auto_apply_threshold: number;
+  auto_apply_daily_limit: number;
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +36,9 @@ export interface JobPreferencesInput {
   experience_level?: ExperienceLevel;
   job_types?: string[];
   industries?: string[];
+  auto_apply_enabled?: boolean;
+  auto_apply_threshold?: number;
+  auto_apply_daily_limit?: number;
 }
 
 export const useJobPreferences = () => {
