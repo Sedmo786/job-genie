@@ -5,6 +5,7 @@ import { useApplications } from '@/hooks/useApplications';
 import { useResume } from '@/hooks/useResume';
 import { useJobPreferences } from '@/hooks/useJobPreferences';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { 
   Sparkles, 
   FileText, 
@@ -19,7 +20,9 @@ import {
   Loader2,
   BarChart3,
   Target,
-  Zap
+  Zap,
+  Rocket,
+  AlertCircle
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -66,6 +69,20 @@ const Dashboard = () => {
   const rejections = applications?.filter(a => 
     a.status === 'rejected'
   ).length || 0;
+
+  // Calculate auto-apply stats for today
+  const todayAutoApplied = applications?.filter(a => {
+    if (a.status !== 'auto_applied') return false;
+    const appliedDate = new Date(a.applied_at || a.created_at);
+    const today = new Date();
+    return appliedDate.toDateString() === today.toDateString();
+  }).length || 0;
+
+  const autoApplyLimit = preferences?.auto_apply_daily_limit || 10;
+  const autoApplyThreshold = preferences?.auto_apply_threshold || 75;
+  const autoApplyEnabled = preferences?.auto_apply_enabled || false;
+  const remainingQuota = Math.max(0, autoApplyLimit - todayAutoApplied);
+  const quotaPercentUsed = (todayAutoApplied / autoApplyLimit) * 100;
 
   const stats = [
     { label: 'Applications Sent', value: applicationsSent, icon: Briefcase, color: 'text-primary' },
@@ -161,6 +178,87 @@ const Dashboard = () => {
               <div className="text-sm text-muted-foreground">{stat.label}</div>
             </div>
           ))}
+        </div>
+
+        {/* Auto-Apply Activity Widget */}
+        <div className="glass-card p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+                <Rocket className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Auto-Apply Activity</h2>
+                <p className="text-sm text-muted-foreground">Today's automated applications</p>
+              </div>
+            </div>
+            {!autoApplyEnabled && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/preferences')}>
+                <AlertCircle className="h-4 w-4 mr-2 text-yellow-500" />
+                Enable Auto-Apply
+              </Button>
+            )}
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Today's Applications */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Today's Auto-Applied</span>
+                <span className="font-bold text-primary">{todayAutoApplied}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Daily Limit</span>
+                <span className="font-medium">{autoApplyLimit}</span>
+              </div>
+            </div>
+
+            {/* Quota Progress */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Quota Used</span>
+                <span className="font-medium">{todayAutoApplied}/{autoApplyLimit}</span>
+              </div>
+              <Progress value={quotaPercentUsed} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                {remainingQuota > 0 
+                  ? `${remainingQuota} applications remaining today`
+                  : 'Daily limit reached - resets at midnight'
+                }
+              </p>
+            </div>
+
+            {/* Match Threshold */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Match Threshold</span>
+                <span className="font-bold text-primary">{autoApplyThreshold}%+</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Jobs scoring {autoApplyThreshold}% or higher will be auto-applied
+              </p>
+              <Button variant="ghost" size="sm" className="w-full" onClick={() => navigate('/preferences')}>
+                <Settings className="h-4 w-4 mr-2" />
+                Adjust Settings
+              </Button>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="mt-6 pt-4 border-t border-border/50 flex flex-wrap gap-3">
+            <Button onClick={() => navigate('/jobs')} className="bg-primary hover:bg-primary/90">
+              <Zap className="h-4 w-4 mr-2" />
+              Find & Auto-Apply Jobs
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/applications')}>
+              <Briefcase className="h-4 w-4 mr-2" />
+              View All Applications
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/analytics')}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              View Analytics
+            </Button>
+          </div>
         </div>
 
         {/* Quick Actions */}
