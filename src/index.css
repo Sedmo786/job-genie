@@ -121,4 +121,7 @@
   .animation-delay-600 {
     animation-delay: 600ms;
   }
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
 }
