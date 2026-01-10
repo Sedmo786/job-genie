@@ -1,19 +1,19 @@
 project_id = "tzcvqppdgugdfbhujbvc"
 
 [functions.analyze-resume]
-verify_jwt = true
+verify_jwt = false
 
 [functions.fetch-jobs]
-verify_jwt = true
+verify_jwt = false
 
 [functions.match-jobs]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-notification]
-verify_jwt = true
+verify_jwt = false
 
 [functions.auto-apply]
-verify_jwt = true
+verify_jwt = false
 
 [functions.daily-job-match]
 verify_jwt = false

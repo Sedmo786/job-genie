@@ -54,8 +54,15 @@ export const useJobs = () => {
   const [hasMore, setHasMore] = useState(true);
 
   const fetchJobs = useCallback(async (query?: string, location?: string, remoteOnly?: boolean, resetPage?: boolean) => {
-    if (!user || !session) {
+    if (!user) {
       toast.error('Please sign in');
+      return;
+    }
+
+    // Refresh session before making the call
+    const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !freshSession) {
+      toast.error('Session expired. Please sign in again.');
       return;
     }
 
@@ -102,7 +109,14 @@ export const useJobs = () => {
   }, []);
 
   const matchJobs = useCallback(async (jobIds: string[], sendNotification = false) => {
-    if (!user || !session || jobIds.length === 0) return;
+    if (!user || jobIds.length === 0) return;
+
+    // Refresh session before making the call
+    const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !freshSession) {
+      toast.error('Session expired. Please sign in again.');
+      return;
+    }
 
     setMatching(true);
     try {
