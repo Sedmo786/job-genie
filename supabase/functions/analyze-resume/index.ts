@@ -55,7 +55,16 @@ serve(async (req) => {
     // Fetch the PDF content
     const pdfResponse = await fetch(signedUrlData.signedUrl);
     const pdfBuffer = await pdfResponse.arrayBuffer();
-    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
+    
+    // Convert to base64 in chunks to avoid stack overflow
+    const uint8Array = new Uint8Array(pdfBuffer);
+    const CHUNK_SIZE = 8192;
+    let pdfBase64 = '';
+    for (let i = 0; i < uint8Array.length; i += CHUNK_SIZE) {
+      const chunk = uint8Array.subarray(i, i + CHUNK_SIZE);
+      pdfBase64 += String.fromCharCode.apply(null, chunk as unknown as number[]);
+    }
+    pdfBase64 = btoa(pdfBase64);
 
     // Use Lovable AI to analyze the resume
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
