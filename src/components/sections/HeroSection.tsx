@@ -49,7 +49,7 @@ const HeroSection = () => {
               Start Applying Now
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Button>
-            <Button variant="heroOutline" size="xl" onClick={() => navigate('/auth')}>
+            <Button variant="heroOutline" size="xl" onClick={() => navigate('/demo')}>
               Watch Demo
             </Button>
           </div>
