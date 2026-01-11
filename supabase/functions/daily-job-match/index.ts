@@ -35,6 +35,8 @@ interface JobPreferences {
   auto_apply_enabled: boolean;
   auto_apply_threshold: number;
   auto_apply_daily_limit: number;
+  auto_apply_schedule: string;
+  auto_apply_email_notifications: boolean;
 }
 
 interface ResumeAnalysis {
@@ -196,14 +198,14 @@ serve(async (req) => {
 
     console.log(`Processing ${preferencesData.length} users...`);
 
-    // Get recent job postings (last 24 hours or recent ones)
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    // Get recent job postings (last 7 days to ensure we have enough jobs to match)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const { data: jobsData, error: jobsError } = await supabaseAdmin
       .from('job_postings')
       .select('*')
-      .gte('created_at', oneDayAgo.toISOString())
+      .gte('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -426,6 +428,163 @@ serve(async (req) => {
         } else {
           console.log(`Email sent to ${userEmail} with ${topMatches.length} matches`);
           results.push({ user_id: preferences.user_id, status: 'success', matches: topMatches.length });
+        }
+
+        // AUTO-APPLY: If enabled and schedule is daily_automatic, apply to high-matching jobs
+        if (preferences.auto_apply_enabled && preferences.auto_apply_schedule === 'daily_automatic') {
+          const threshold = preferences.auto_apply_threshold || 75;
+          const dailyLimit = preferences.auto_apply_daily_limit || 10;
+          
+          // Check today's auto-apply count
+          const todayStr = new Date().toISOString().split('T')[0];
+          const { count: todayCount } = await supabaseAdmin
+            .from('applications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', preferences.user_id)
+            .eq('status', 'auto_applied')
+            .gte('created_at', `${todayStr}T00:00:00.000Z`);
+
+          const remainingLimit = dailyLimit - (todayCount || 0);
+          
+          if (remainingLimit > 0) {
+            const eligibleMatches = topMatches
+              .filter(m => m.score >= threshold)
+              .slice(0, remainingLimit);
+            
+            const autoAppliedJobs: { job_title: string; company_name: string; status: string; match_score: number }[] = [];
+            
+            for (const match of eligibleMatches) {
+              const canAutoApply = !match.job.apply_url || match.job.apply_url.includes('linkedin.com/jobs/view');
+              const status = canAutoApply ? 'auto_applied' : 'manual_required';
+              
+              const { error: insertError } = await supabaseAdmin
+                .from('applications')
+                .insert({
+                  user_id: preferences.user_id,
+                  job_posting_id: match.job.id,
+                  job_title: match.job.title,
+                  company_name: match.job.company,
+                  company_logo_url: match.job.company_logo_url,
+                  job_url: match.job.apply_url,
+                  job_description: match.job.description,
+                  location: match.job.location,
+                  work_type: match.job.work_type,
+                  salary_range: match.job.salary_min && match.job.salary_max 
+                    ? `USD ${match.job.salary_min.toLocaleString()} - ${match.job.salary_max.toLocaleString()}`
+                    : null,
+                  status,
+                  applied_at: status === 'auto_applied' ? new Date().toISOString() : null,
+                  match_score: match.score,
+                  match_reasons: match.reasons,
+                });
+
+              if (!insertError) {
+                autoAppliedJobs.push({
+                  job_title: match.job.title,
+                  company_name: match.job.company,
+                  status,
+                  match_score: match.score,
+                });
+              }
+            }
+
+            // Send auto-apply email if notifications enabled
+            if (autoAppliedJobs.length > 0 && preferences.auto_apply_email_notifications !== false) {
+              const autoApplied = autoAppliedJobs.filter(j => j.status === 'auto_applied');
+              const manualRequired = autoAppliedJobs.filter(j => j.status === 'manual_required');
+              
+              const autoApplyHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; }
+                    .header { background: linear-gradient(135deg, #8B5CF6, #6366F1); padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+                    .header h1 { color: white; margin: 0; font-size: 24px; }
+                    .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; }
+                    .stat-box { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+                    .stat-number { font-size: 32px; font-weight: bold; color: #8B5CF6; }
+                    .job-list { list-style: none; padding: 0; }
+                    .job-item { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #10B981; }
+                    .job-item.manual { border-left-color: #F59E0B; }
+                    .job-title { font-weight: bold; color: #333; }
+                    .job-company { color: #666; font-size: 14px; }
+                    .match-badge { background: #10B981; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+                    .btn { display: inline-block; background: #8B5CF6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 20px; }
+                  </style>
+                </head>
+                <body>
+                  <div class="container">
+                    <div class="header">
+                      <h1>🚀 Auto-Apply Summary</h1>
+                    </div>
+                    <div class="content">
+                      <div class="stat-box">
+                        <div class="stat-number">${autoApplied.length}</div>
+                        <div>Jobs Auto-Applied</div>
+                      </div>
+                      
+                      ${autoApplied.length > 0 ? `
+                        <h3>✅ Successfully Applied</h3>
+                        <ul class="job-list">
+                          ${autoApplied.map(job => `
+                            <li class="job-item">
+                              <div class="job-title">${job.job_title} <span class="match-badge">${job.match_score}%</span></div>
+                              <div class="job-company">${job.company_name}</div>
+                            </li>
+                          `).join('')}
+                        </ul>
+                      ` : ''}
+                      
+                      ${manualRequired.length > 0 ? `
+                        <h3>⚠️ Manual Application Required</h3>
+                        <ul class="job-list">
+                          ${manualRequired.map(job => `
+                            <li class="job-item manual">
+                              <div class="job-title">${job.job_title} <span class="match-badge">${job.match_score}%</span></div>
+                              <div class="job-company">${job.company_name}</div>
+                            </li>
+                          `).join('')}
+                        </ul>
+                      ` : ''}
+                      
+                      <div style="text-align: center;">
+                        <a href="${baseUrl}/applications" class="btn">View Applications</a>
+                      </div>
+                    </div>
+                  </div>
+                </body>
+                </html>
+              `;
+
+              await resend.emails.send({
+                from: 'AutoApply <onboarding@resend.dev>',
+                to: [userEmail],
+                subject: `🚀 Auto-Applied to ${autoApplied.length} Jobs Today!`,
+                html: autoApplyHtml,
+              });
+              
+              console.log(`Auto-applied to ${autoApplied.length} jobs for user ${preferences.user_id}`);
+            }
+
+            // Update analytics
+            const autoAppliedCount = autoAppliedJobs.filter(j => j.status === 'auto_applied').length;
+            const manualRequiredCount = autoAppliedJobs.filter(j => j.status === 'manual_required').length;
+            
+            if (autoAppliedCount > 0 || manualRequiredCount > 0) {
+              await supabaseAdmin
+                .from('job_analytics')
+                .upsert({
+                  user_id: preferences.user_id,
+                  date: todayStr,
+                  jobs_auto_applied: autoAppliedCount,
+                  jobs_manual_required: manualRequiredCount,
+                }, {
+                  onConflict: 'user_id,date',
+                });
+            }
+          }
         }
 
         // Update analytics
