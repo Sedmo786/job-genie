@@ -202,7 +202,9 @@ export type Database = {
       job_preferences: {
         Row: {
           auto_apply_daily_limit: number | null
+          auto_apply_email_notifications: boolean | null
           auto_apply_enabled: boolean | null
+          auto_apply_schedule: string | null
           auto_apply_threshold: number | null
           created_at: string
           desired_roles: string[] | null
@@ -224,7 +226,9 @@ export type Database = {
         }
         Insert: {
           auto_apply_daily_limit?: number | null
+          auto_apply_email_notifications?: boolean | null
           auto_apply_enabled?: boolean | null
+          auto_apply_schedule?: string | null
           auto_apply_threshold?: number | null
           created_at?: string
           desired_roles?: string[] | null
@@ -246,7 +250,9 @@ export type Database = {
         }
         Update: {
           auto_apply_daily_limit?: number | null
+          auto_apply_email_notifications?: boolean | null
           auto_apply_enabled?: boolean | null
+          auto_apply_schedule?: string | null
           auto_apply_threshold?: number | null
           created_at?: string
           desired_roles?: string[] | null

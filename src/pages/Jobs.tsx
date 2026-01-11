@@ -11,7 +11,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Sparkles, ArrowLeft, Loader2, Search, MapPin, Briefcase, ExternalLink, Plus, Zap, Rocket } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Sparkles, ArrowLeft, Loader2, Search, MapPin, Briefcase, ExternalLink, Plus, Zap, Rocket, Play, Timer, Calendar, Settings, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Jobs = () => {
@@ -19,13 +21,15 @@ const Jobs = () => {
   const navigate = useNavigate();
   const { jobs, matchedJobs, loading, matching, fetchJobs, matchJobs, hasMore, loadMore } = useJobs();
   const { addApplication, refetch: refetchApplications } = useApplications();
-  const { autoApply, applying } = useAutoApply();
-  const { preferences } = useJobPreferences();
+  const { autoApply, applying, scheduleAutoApply } = useAutoApply();
+  const { preferences, savePreferences } = useJobPreferences();
 
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('');
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [showMatched, setShowMatched] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<string>(preferences?.auto_apply_schedule || 'now');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -44,7 +48,7 @@ const Jobs = () => {
     }
   };
 
-  const handleAutoApply = async () => {
+  const handleAutoApply = async (schedule: string) => {
     if (matchedJobs.length === 0) {
       toast.error('Match jobs first to use auto-apply');
       return;
@@ -56,11 +60,35 @@ const Jobs = () => {
       reasons: m.reasons,
       explanation: m.explanation,
     }));
-    
-    const result = await autoApply(matches);
-    if (result?.summary && (result.summary.auto_applied > 0 || result.summary.manual_required > 0)) {
-      refetchApplications();
+
+    // Save the schedule preference
+    if (schedule !== preferences?.auto_apply_schedule) {
+      await savePreferences({ auto_apply_schedule: schedule as 'now' | 'after_1hr' | 'daily_automatic' | 'manual' });
     }
+    
+    if (schedule === 'now') {
+      const result = await autoApply(matches);
+      if (result?.summary && (result.summary.auto_applied > 0 || result.summary.manual_required > 0)) {
+        refetchApplications();
+      }
+    } else if (schedule === 'after_1hr') {
+      scheduleAutoApply(matches, 60); // 60 minutes
+      toast.success('Auto-apply scheduled for 1 hour from now');
+    } else if (schedule === 'daily_automatic') {
+      scheduleAutoApply(matches, 'daily');
+      toast.success('Auto-apply will run automatically each day');
+    }
+    
+    setShowScheduleDialog(false);
+  };
+
+  const openScheduleDialog = () => {
+    if (matchedJobs.length === 0) {
+      toast.error('Match jobs first to use auto-apply');
+      return;
+    }
+    setSelectedSchedule(preferences?.auto_apply_schedule || 'now');
+    setShowScheduleDialog(true);
   };
 
   const handleSaveJob = async (job: typeof jobs[0], score?: number) => {
@@ -153,10 +181,85 @@ const Jobs = () => {
                   AI Match ({matchedJobs.length})
                 </Button>
                 {matchedJobs.length > 0 && preferences?.auto_apply_enabled && (
-                  <Button onClick={handleAutoApply} disabled={applying} className="bg-green-600 hover:bg-green-700">
-                    {applying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Rocket className="h-4 w-4 mr-2" />}
-                    Auto-Apply ({preferences.auto_apply_threshold}%+ matches)
-                  </Button>
+                  <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+                    <DialogTrigger asChild>
+                      <Button onClick={openScheduleDialog} disabled={applying} className="bg-green-600 hover:bg-green-700">
+                        {applying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Rocket className="h-4 w-4 mr-2" />}
+                        Auto-Apply ({preferences.auto_apply_threshold}%+ matches)
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Rocket className="h-5 w-5 text-primary" />
+                          Schedule Auto-Apply
+                        </DialogTitle>
+                        <DialogDescription>
+                          Choose when to apply to {matchedJobs.filter(m => m.score >= (preferences.auto_apply_threshold || 75)).length} matching jobs
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <RadioGroup
+                          value={selectedSchedule}
+                          onValueChange={setSelectedSchedule}
+                          className="space-y-3"
+                        >
+                          <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                            <RadioGroupItem value="now" id="schedule-now" />
+                            <div className="flex-1">
+                              <Label htmlFor="schedule-now" className="flex items-center gap-2 cursor-pointer font-medium">
+                                <Play className="h-4 w-4 text-green-500" />
+                                Apply Now
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-1">Submit applications immediately</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                            <RadioGroupItem value="after_1hr" id="schedule-1hr" />
+                            <div className="flex-1">
+                              <Label htmlFor="schedule-1hr" className="flex items-center gap-2 cursor-pointer font-medium">
+                                <Timer className="h-4 w-4 text-blue-500" />
+                                After 1 Hour
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-1">Review matched jobs before applying</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                            <RadioGroupItem value="daily_automatic" id="schedule-daily" />
+                            <div className="flex-1">
+                              <Label htmlFor="schedule-daily" className="flex items-center gap-2 cursor-pointer font-medium">
+                                <Calendar className="h-4 w-4 text-purple-500" />
+                                Daily Automatic
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-1">Automatically apply once per day</p>
+                            </div>
+                          </div>
+                        </RadioGroup>
+                        
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">
+                            {preferences.auto_apply_email_notifications 
+                              ? "You'll receive an email summary after applications are submitted"
+                              : "Email notifications are disabled"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setShowScheduleDialog(false)} className="flex-1">
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={() => handleAutoApply(selectedSchedule)} 
+                          disabled={applying}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                        >
+                          {applying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          {selectedSchedule === 'now' ? 'Apply Now' : 'Schedule'}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 )}
                 {matchedJobs.length > 0 && !preferences?.auto_apply_enabled && (
                   <Button variant="outline" onClick={() => navigate('/preferences')} className="text-muted-foreground">

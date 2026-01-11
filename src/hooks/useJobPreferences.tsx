@@ -7,6 +7,8 @@ import type { Database } from '@/integrations/supabase/types';
 type RemotePreference = Database['public']['Enums']['remote_preference'];
 type ExperienceLevel = Database['public']['Enums']['experience_level'];
 
+export type AutoApplySchedule = 'now' | 'after_1hr' | 'daily_automatic' | 'manual';
+
 export interface JobPreferences {
   id: string;
   user_id: string;
@@ -22,6 +24,8 @@ export interface JobPreferences {
   auto_apply_enabled: boolean;
   auto_apply_threshold: number;
   auto_apply_daily_limit: number;
+  auto_apply_schedule: AutoApplySchedule;
+  auto_apply_email_notifications: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +43,8 @@ export interface JobPreferencesInput {
   auto_apply_enabled?: boolean;
   auto_apply_threshold?: number;
   auto_apply_daily_limit?: number;
+  auto_apply_schedule?: AutoApplySchedule;
+  auto_apply_email_notifications?: boolean;
 }
 
 export const useJobPreferences = () => {
@@ -61,7 +67,15 @@ export const useJobPreferences = () => {
         .maybeSingle();
 
       if (error) throw error;
-      setPreferences(data);
+      if (data) {
+        setPreferences({
+          ...data,
+          auto_apply_schedule: (data.auto_apply_schedule as AutoApplySchedule) || 'manual',
+          auto_apply_email_notifications: data.auto_apply_email_notifications ?? true,
+        });
+      } else {
+        setPreferences(null);
+      }
     } catch (error) {
       console.error('Error fetching preferences:', error);
     } finally {
@@ -92,7 +106,11 @@ export const useJobPreferences = () => {
 
       if (error) throw error;
       
-      setPreferences(data);
+      setPreferences({
+        ...data,
+        auto_apply_schedule: (data.auto_apply_schedule as AutoApplySchedule) || 'manual',
+        auto_apply_email_notifications: data.auto_apply_email_notifications ?? true,
+      });
       toast.success('Preferences saved successfully');
       return data;
     } catch (error) {
