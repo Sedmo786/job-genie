@@ -89,6 +89,16 @@ export function useResume() {
       if (insertError) throw insertError;
 
       toast.success('Resume uploaded successfully');
+      
+      // Send email notification
+      try {
+        await supabase.functions.invoke('send-notification', {
+          body: { type: 'resume_uploaded', fileName: file.name },
+        });
+      } catch (notifyError) {
+        console.log('Could not send upload notification:', notifyError);
+      }
+      
       await fetchResumes();
       return data;
     } catch (error: any) {

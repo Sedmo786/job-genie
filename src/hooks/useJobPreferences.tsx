@@ -111,6 +111,16 @@ export const useJobPreferences = () => {
         auto_apply_schedule: (data.auto_apply_schedule as AutoApplySchedule) || 'manual',
         auto_apply_email_notifications: data.auto_apply_email_notifications ?? true,
       });
+      
+      // Send email notification
+      try {
+        await supabase.functions.invoke('send-notification', {
+          body: { type: 'preferences_saved' },
+        });
+      } catch (notifyError) {
+        console.log('Could not send preferences notification:', notifyError);
+      }
+      
       toast.success('Preferences saved successfully');
       return data;
     } catch (error) {

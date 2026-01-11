@@ -234,14 +234,14 @@ serve(async (req) => {
       `;
     } else if (type === 'application_complete') {
       const app = applications[0] as Application;
-      subject = `Application Submitted: ${app.job_title} at ${app.company_name}`;
+      subject = `✅ Application Submitted: ${app.job_title} at ${app.company_name}`;
       htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; }
             .header { background: linear-gradient(135deg, #10B981, #059669); padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
             .header h1 { color: white; margin: 0; font-size: 24px; }
             .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; }
@@ -262,6 +262,110 @@ serve(async (req) => {
                 ${app.match_score ? `<p style="color: #10B981; font-weight: bold;">Match Score: ${app.match_score}%</p>` : ''}
               </div>
               <a href="${baseUrl}/applications" class="btn">Track Application</a>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+    } else if (type === 'preferences_saved') {
+      subject = `⚙️ Your Job Preferences Have Been Updated`;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .header { background: linear-gradient(135deg, #8B5CF6, #6366F1); padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; }
+            .info-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+            .feature { padding: 12px; border-left: 3px solid #8B5CF6; margin-bottom: 10px; background: #F8F7FF; }
+            .feature-title { font-weight: 600; color: #8B5CF6; }
+            .btn { display: inline-block; background: #8B5CF6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⚙️ Preferences Updated!</h1>
+            </div>
+            <div class="content">
+              <div class="info-card">
+                <h3 style="margin-top: 0;">Your job preferences have been saved</h3>
+                <p>We'll use these preferences to find the best job matches for you.</p>
+                
+                <div class="feature">
+                  <div class="feature-title">🎯 Daily Job Matching</div>
+                  <p style="margin: 5px 0 0; font-size: 14px; color: #666;">You'll receive daily emails with jobs matching your criteria.</p>
+                </div>
+                
+                <div class="feature">
+                  <div class="feature-title">🚀 Auto-Apply</div>
+                  <p style="margin: 5px 0 0; font-size: 14px; color: #666;">When enabled, we'll automatically apply to high-matching jobs for you.</p>
+                </div>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="${baseUrl}/jobs" class="btn">Discover Jobs</a>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+    } else if (type === 'resume_uploaded') {
+      const fileName = (await req.json()).fileName || 'your resume';
+      subject = `📄 Resume Uploaded Successfully`;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .header { background: linear-gradient(135deg, #10B981, #059669); padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; }
+            .success-card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+            .icon { font-size: 48px; margin-bottom: 15px; }
+            .steps { text-align: left; margin-top: 20px; }
+            .step { display: flex; gap: 12px; margin-bottom: 15px; }
+            .step-number { background: #10B981; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0; }
+            .step-text { font-size: 14px; color: #666; }
+            .btn { display: inline-block; background: #10B981; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>📄 Resume Uploaded!</h1>
+            </div>
+            <div class="content">
+              <div class="success-card">
+                <div class="icon">✅</div>
+                <h2 style="margin: 0;">Resume uploaded successfully!</h2>
+                <p style="color: #666;">We're now analyzing your resume to find the best job matches.</p>
+                
+                <div class="steps">
+                  <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-text"><strong>Resume Analysis</strong> - We'll extract your skills, experience, and qualifications.</div>
+                  </div>
+                  <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-text"><strong>Job Matching</strong> - We'll match you with relevant job opportunities.</div>
+                  </div>
+                  <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-text"><strong>Daily Updates</strong> - Receive daily emails with new job matches.</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="${baseUrl}/resumes" class="btn">View Resumes</a>
+              </div>
             </div>
           </div>
         </body>
