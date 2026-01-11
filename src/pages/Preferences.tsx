@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useJobPreferences, type JobPreferencesInput } from '@/hooks/useJobPreferences';
+import { useJobPreferences, type JobPreferencesInput, type AutoApplySchedule } from '@/hooks/useJobPreferences';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Sparkles, ArrowLeft, Loader2, Save, Zap, AlertTriangle } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Sparkles, ArrowLeft, Loader2, Save, Zap, AlertTriangle, Clock, Mail, Play, Timer, Calendar, Settings } from 'lucide-react';
 import { useState } from 'react';
 
 const Preferences = () => {
@@ -30,6 +31,8 @@ const Preferences = () => {
     auto_apply_enabled: false,
     auto_apply_threshold: 75,
     auto_apply_daily_limit: 10,
+    auto_apply_schedule: 'manual',
+    auto_apply_email_notifications: true,
   });
 
   const [rolesInput, setRolesInput] = useState('');
@@ -56,6 +59,8 @@ const Preferences = () => {
         auto_apply_enabled: preferences.auto_apply_enabled || false,
         auto_apply_threshold: preferences.auto_apply_threshold || 75,
         auto_apply_daily_limit: preferences.auto_apply_daily_limit || 10,
+        auto_apply_schedule: preferences.auto_apply_schedule || 'manual',
+        auto_apply_email_notifications: preferences.auto_apply_email_notifications ?? true,
       });
       setRolesInput((preferences.desired_roles || []).join(', '));
       setLocationsInput((preferences.locations || []).join(', '));
@@ -210,6 +215,60 @@ const Preferences = () => {
                   </div>
                 </div>
 
+                {/* Schedule Selection */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <Label className="text-base font-medium">When to Auto-Apply</Label>
+                  </div>
+                  <RadioGroup
+                    value={form.auto_apply_schedule}
+                    onValueChange={(v) => setForm({ ...form, auto_apply_schedule: v as AutoApplySchedule })}
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="manual" id="manual" />
+                      <div className="flex-1">
+                        <Label htmlFor="manual" className="flex items-center gap-2 cursor-pointer font-medium">
+                          <Settings className="h-4 w-4 text-muted-foreground" />
+                          Manual
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">Trigger auto-apply yourself</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="now" id="now" />
+                      <div className="flex-1">
+                        <Label htmlFor="now" className="flex items-center gap-2 cursor-pointer font-medium">
+                          <Play className="h-4 w-4 text-green-500" />
+                          Apply Now
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">Apply immediately on matches</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="after_1hr" id="after_1hr" />
+                      <div className="flex-1">
+                        <Label htmlFor="after_1hr" className="flex items-center gap-2 cursor-pointer font-medium">
+                          <Timer className="h-4 w-4 text-blue-500" />
+                          After 1 Hour
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">Review before applying</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="daily_automatic" id="daily_automatic" />
+                      <div className="flex-1">
+                        <Label htmlFor="daily_automatic" className="flex items-center gap-2 cursor-pointer font-medium">
+                          <Calendar className="h-4 w-4 text-purple-500" />
+                          Daily Automatic
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">Auto-apply once per day</p>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
                 <div className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex justify-between">
@@ -242,6 +301,21 @@ const Preferences = () => {
                     />
                     <p className="text-xs text-muted-foreground">Maximum number of auto-applications per day</p>
                   </div>
+                </div>
+
+                {/* Email Notifications */}
+                <div className="flex items-center justify-between p-4 rounded-lg bg-background border">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-medium">Email Notifications</p>
+                      <p className="text-sm text-muted-foreground">Get notified when applications are submitted</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={form.auto_apply_email_notifications}
+                    onCheckedChange={(checked) => setForm({ ...form, auto_apply_email_notifications: checked })}
+                  />
                 </div>
               </>
             )}

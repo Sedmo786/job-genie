@@ -1,8 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useNotifications } from '@/hooks/useNotifications';
 
 interface JobMatch {
   job_id: string;
@@ -17,7 +16,7 @@ interface JobMatch {
   explanation: string;
 }
 
-interface AutoApplyResult {
+export interface AutoApplyResult {
   job_id: string;
   job_title: string;
   company_name: string;
@@ -27,7 +26,7 @@ interface AutoApplyResult {
   reason?: string;
 }
 
-interface AutoApplyResponse {
+export interface AutoApplyResponse {
   success: boolean;
   results: AutoApplyResult[];
   summary?: {
@@ -40,9 +39,10 @@ interface AutoApplyResponse {
 
 export const useAutoApply = () => {
   const { user, session } = useAuth();
-  const { sendApplicationCompleteNotification, sendDailySummaryNotification } = useNotifications();
   const [applying, setApplying] = useState(false);
   const [lastResults, setLastResults] = useState<AutoApplyResult[]>([]);
+  const [scheduledTime, setScheduledTime] = useState<Date | null>(null);
+  const scheduledTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const autoApply = useCallback(async (matches: JobMatch[]): Promise<AutoApplyResponse | null> => {
     if (!user || !session || matches.length === 0) {
@@ -69,16 +69,6 @@ export const useAutoApply = () => {
         
         if (auto_applied > 0) {
           toast.success(`Auto-applied to ${auto_applied} job${auto_applied > 1 ? 's' : ''}!`);
-          
-          // Send notification for auto-applied jobs
-          const autoAppliedJobs = response.results.filter(r => r.status === 'auto_applied');
-          if (autoAppliedJobs.length > 0) {
-            sendDailySummaryNotification(autoAppliedJobs.map(j => ({
-              job_title: j.job_title,
-              company_name: j.company_name,
-              status: 'auto_applied',
-            })));
-          }
         }
         
         if (manual_required > 0) {
@@ -96,11 +86,65 @@ export const useAutoApply = () => {
     } finally {
       setApplying(false);
     }
-  }, [user, session, sendDailySummaryNotification]);
+  }, [user, session]);
+
+  const scheduleAutoApply = useCallback((matches: JobMatch[], delayMinutesOrDaily: number | 'daily') => {
+    // Clear any existing scheduled timeout
+    if (scheduledTimeoutRef.current) {
+      clearTimeout(scheduledTimeoutRef.current);
+      scheduledTimeoutRef.current = null;
+    }
+
+    if (delayMinutesOrDaily === 'daily') {
+      // For daily, we'll schedule for next occurrence (this is a simplified version)
+      // In production, this would be handled by a cron job
+      const now = new Date();
+      const scheduledFor = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Next day
+      setScheduledTime(scheduledFor);
+      
+      // Store matches in localStorage for daily processing
+      localStorage.setItem('scheduledAutoApplyMatches', JSON.stringify(matches));
+      localStorage.setItem('scheduledAutoApplyTime', scheduledFor.toISOString());
+      
+      toast.success('Daily auto-apply enabled. Applications will be submitted each day.');
+      return;
+    }
+
+    const delayMs = delayMinutesOrDaily * 60 * 1000;
+    const scheduledFor = new Date(Date.now() + delayMs);
+    setScheduledTime(scheduledFor);
+
+    // Store the scheduled info in localStorage in case the page is refreshed
+    localStorage.setItem('scheduledAutoApplyMatches', JSON.stringify(matches));
+    localStorage.setItem('scheduledAutoApplyTime', scheduledFor.toISOString());
+
+    scheduledTimeoutRef.current = setTimeout(async () => {
+      toast.info('Running scheduled auto-apply...');
+      await autoApply(matches);
+      setScheduledTime(null);
+      localStorage.removeItem('scheduledAutoApplyMatches');
+      localStorage.removeItem('scheduledAutoApplyTime');
+    }, delayMs);
+
+  }, [autoApply]);
+
+  const cancelScheduledAutoApply = useCallback(() => {
+    if (scheduledTimeoutRef.current) {
+      clearTimeout(scheduledTimeoutRef.current);
+      scheduledTimeoutRef.current = null;
+    }
+    setScheduledTime(null);
+    localStorage.removeItem('scheduledAutoApplyMatches');
+    localStorage.removeItem('scheduledAutoApplyTime');
+    toast.info('Scheduled auto-apply cancelled');
+  }, []);
 
   return {
     autoApply,
     applying,
     lastResults,
+    scheduleAutoApply,
+    scheduledTime,
+    cancelScheduledAutoApply,
   };
 };

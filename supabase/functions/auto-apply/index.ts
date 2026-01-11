@@ -66,7 +66,7 @@ serve(async (req) => {
     // Get user's auto-apply preferences
     const { data: preferences, error: prefError } = await supabaseClient
       .from('job_preferences')
-      .select('auto_apply_enabled, auto_apply_threshold, auto_apply_daily_limit')
+      .select('auto_apply_enabled, auto_apply_threshold, auto_apply_daily_limit, auto_apply_schedule, auto_apply_email_notifications')
       .eq('user_id', user.id)
       .single();
 
@@ -77,6 +77,7 @@ serve(async (req) => {
     const autoApplyEnabled = preferences?.auto_apply_enabled ?? false;
     const threshold = preferences?.auto_apply_threshold ?? 75;
     const dailyLimit = preferences?.auto_apply_daily_limit ?? 10;
+    const emailNotifications = preferences?.auto_apply_email_notifications ?? true;
 
     if (!autoApplyEnabled) {
       return new Response(JSON.stringify({ 
@@ -236,6 +237,37 @@ serve(async (req) => {
     }
 
     console.log(`Auto-apply completed: ${autoAppliedCount} auto-applied, ${manualRequiredCount} manual required`);
+
+    // Send email notification if enabled
+    if (emailNotifications && (autoAppliedCount > 0 || manualRequiredCount > 0)) {
+      try {
+        const emailResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader,
+          },
+          body: JSON.stringify({
+            type: 'daily_summary',
+            applications: results.map(r => ({
+              job_title: r.job_title,
+              company_name: r.company_name,
+              status: r.status,
+              job_url: r.apply_url,
+              match_score: r.match_score,
+            })),
+          }),
+        });
+        
+        if (emailResponse.ok) {
+          console.log('Email notification sent successfully');
+        } else {
+          console.error('Failed to send email notification:', await emailResponse.text());
+        }
+      } catch (emailError) {
+        console.error('Error sending email notification:', emailError);
+      }
+    }
 
     return new Response(JSON.stringify({ 
       success: true, 
