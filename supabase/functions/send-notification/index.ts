@@ -32,26 +32,36 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
+    const body = await req.json();
+    const { type, applications, matches, statusUpdate, email: directEmail, data, fileName } = body;
+    
+    let userEmail: string;
+    
+    // Allow direct email for internal/test calls (e.g., from daily-job-match cron)
+    if (directEmail) {
+      userEmail = directEmail;
+    } else {
+      // Authenticated calls from frontend
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        throw new Error('No authorization header');
+      }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      throw new Error('Unauthorized');
-    }
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Unauthorized');
+      }
 
-    const { type, applications, matches, statusUpdate } = await req.json();
-
-    if (!user.email) {
-      throw new Error('User email not found');
+      if (!user.email) {
+        throw new Error('User email not found');
+      }
+      userEmail = user.email;
     }
 
     const baseUrl = Deno.env.get('SITE_URL') || 'https://autoapply.lovable.app';
@@ -315,7 +325,7 @@ serve(async (req) => {
         </html>
       `;
     } else if (type === 'resume_uploaded') {
-      const fileName = (await req.json()).fileName || 'your resume';
+      const resumeFileName = fileName || 'your resume';
       subject = `📄 Resume Uploaded Successfully`;
       htmlContent = `
         <!DOCTYPE html>
@@ -371,13 +381,47 @@ serve(async (req) => {
         </body>
         </html>
       `;
+    } else if (type === 'test') {
+      const message = data?.message || 'This is a test notification';
+      subject = `🧪 Test Notification from Job Genie`;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #10B981, #059669); padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }
+            .header h1 { color: white; margin: 0; font-size: 24px; }
+            .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 12px 12px; text-align: center; }
+            .success-icon { font-size: 64px; margin-bottom: 20px; }
+            .message { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🧪 Test Notification</h1>
+            </div>
+            <div class="content">
+              <div class="success-icon">✅</div>
+              <div class="message">
+                <h2>Email Setup Working!</h2>
+                <p>${message}</p>
+                <p style="color: #666; margin-top: 20px;">If you received this email, your notification system is configured correctly.</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
     }
 
-    console.log(`Sending ${type} email to ${user.email}`);
+    console.log(`Sending ${type} email to ${userEmail}`);
 
     const { error: emailError } = await resend.emails.send({
       from: 'AutoApply <onboarding@resend.dev>',
-      to: [user.email],
+      to: [userEmail],
       subject,
       html: htmlContent,
     });
