@@ -292,7 +292,7 @@ serve(async (req) => {
         console.log(`Found ${topMatches.length} matches for user ${preferences.user_id}`);
 
         // Send email digest
-        const baseUrl = Deno.env.get('SITE_URL') || 'https://autoapply.lovable.app';
+        const baseUrl = Deno.env.get('SITE_URL') || 'https://job-genie-auto-apply.lovable.app';
         
         const highMatches = topMatches.filter(m => m.score >= 75);
         const goodMatches = topMatches.filter(m => m.score >= 50 && m.score < 75);
