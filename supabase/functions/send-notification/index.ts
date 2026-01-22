@@ -64,7 +64,7 @@ serve(async (req) => {
       userEmail = user.email;
     }
 
-    const baseUrl = Deno.env.get('SITE_URL') || 'https://autoapply.lovable.app';
+    const baseUrl = Deno.env.get('SITE_URL') || 'https://job-genie-auto-apply.lovable.app';
 
     let subject = '';
     let htmlContent = '';
